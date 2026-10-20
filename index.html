@@ -1,0 +1,160 @@
+
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tik-tom</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101010;color:white;font-family:Arial,sans-serif}
+header{padding:18px;background:#181818;font-size:25px;font-weight:bold}
+header span{color:#fe2c55}
+main{max-width:500px;margin:auto;padding:20px}
+.card{background:#202020;border-radius:18px;padding:18px;margin:18px 0}
+button{width:100%;padding:14px;margin-top:12px;border:0;
+border-radius:12px;background:#fe2c55;color:white;
+font-size:16px;font-weight:bold}
+button:disabled{opacity:.45}
+video,img{width:100%;border-radius:12px;margin-top:12px}
+.note{color:#bbb;font-size:14px;line-height:1.5}
+#status{white-space:pre-wrap;line-height:1.5}
+</style>
+</head>
+<body>
+<header><span>Tik</span>-tom</header>
+<main>
+  <h2>Descoperă. Creează. Împărtășește.</h2>
+  <p class="note">Fă o fotografie și trimite-o doar dacă dorești.
+  Camera pornește numai când apeși butonul de mai jos.</p>
+
+  <section class="card">
+    <h3>📸 Fotografia ta</h3>
+    <video id="video" autoplay playsinline hidden></video>
+    <canvas id="canvas" hidden></canvas>
+    <img id="preview" alt="Previzualizare fotografie" hidden>
+
+    <button id="start">Deschide camera</button>
+    <button id="capture" hidden>Fă fotografia</button>
+
+    <label class="note">
+      <input id="consent" type="checkbox">
+      Am ales această fotografie și sunt de acord să o trimit
+      prin Telegram.
+    </label>
+
+    <button id="send" disabled>Trimite fotografia</button>
+    <button id="retake" hidden>Fă altă fotografie</button>
+    <p id="status" class="note" role="status"></p>
+  </section>
+</main>
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const preview = document.getElementById('preview');
+const start = document.getElementById('start');
+const capture = document.getElementById('capture');
+const send = document.getElementById('send');
+const consent = document.getElementById('consent');
+const retake = document.getElementById('retake');
+const status = document.getElementById('status');
+
+let stream = null;
+let photo = null;
+
+// Adaugă URL-ul serverului securizat după ce îl configurăm.
+const API_URL = "";
+
+function updateSend() {
+  send.disabled = !(photo && consent.checked);
+}
+
+function stopCamera() {
+  if (stream) stream.getTracks().forEach(track => track.stop());
+  stream = null;
+  video.srcObject = null;
+}
+
+start.onclick = async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" },
+      audio: false
+    });
+    video.srcObject = stream;
+    video.hidden = false;
+    capture.hidden = false;
+    start.hidden = true;
+    status.textContent = "Camera este activă. Fă o fotografie când ești gata.";
+  } catch (e) {
+    status.textContent = "Camera nu a putut fi deschisă. Verifică permisiunea și conexiunea HTTPS.";
+  }
+};
+
+capture.onclick = () => {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  photo = canvas.toDataURL('image/jpeg', 0.85);
+  preview.src = photo;
+  preview.hidden = false;
+  video.hidden = true;
+  capture.hidden = true;
+  retake.hidden = false;
+  stopCamera();
+  status.textContent = "Verifică fotografia. Nimic nu a fost trimis încă.";
+  updateSend();
+};
+
+consent.onchange = updateSend;
+
+retake.onclick = () => {
+  photo = null;
+  preview.hidden = true;
+  retake.hidden = true;
+  consent.checked = false;
+  send.disabled = true;
+  start.hidden = false;
+  status.textContent = "";
+};
+
+send.onclick = async () => {
+  if (!photo || !consent.checked) return;
+
+  if (!API_URL) {
+    status.textContent =
+      "Fotografia nu a fost trimisă. Serverul securizat trebuie configurat mai întâi.";
+    return;
+  }
+
+  send.disabled = true;
+  status.textContent = "Se trimite fotografia...";
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ photo: photo, consent: true })
+    });
+
+    if (!response.ok) throw new Error("Trimiterea a eșuat.");
+
+    status.textContent = "Fotografia a fost trimisă.";
+    photo = null;
+    preview.hidden = true;
+    consent.checked = false;
+    retake.hidden = true;
+    start.hidden = false;
+  } catch (e) {
+    status.textContent =
+      "Trimiterea nu a reușit. Încearcă din nou mai târziu.";
+    updateSend();
+  }
+};
+
+window.addEventListener('pagehide', stopCamera);
+</script>
+</body>
+  </html>
+  
